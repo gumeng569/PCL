@@ -1,0 +1,46 @@
+name: 新清歌版 PCL 构建
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/qingge-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: 检出源码与子模块
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: 应用新清歌版补丁
+        shell: pwsh
+        run: ./patches/apply-qingge.ps1
+
+      - name: 准备内置帮助文档
+        shell: pwsh
+        run: |
+          git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1 ../PCL2Help
+          Compress-Archive -Path ../PCL2Help/* -DestinationPath "Plain Craft Launcher 2\Resources\Help.zip" -Force
+          Remove-Item ../PCL2Help -Recurse -Force
+
+      - name: 配置 MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: 还原 NuGet 依赖
+        run: dotnet restore PCLCS\PCLCS.csproj
+
+      - name: 编译启动器
+        run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Release -p:Platform=AnyCPU
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: QinggePCL-exe
+          path: Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe
+          if-no-files-found: error
