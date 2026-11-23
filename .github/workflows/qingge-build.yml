@@ -66,6 +66,32 @@ jobs:
           [IO.File]::WriteAllText($lx, $text, $enc)
           Write-Host '已隐藏正版登录入口。'
 
+          # 品牌化与允许多开
+          $fm = 'Plain Craft Launcher 2/FormMain.xaml'
+          $t1 = [IO.File]::ReadAllText($fm, [Text.Encoding]::UTF8)
+          $t1 = $t1.Replace('Title="Plain Craft Launcher', 'Title="新清歌版 PCL')
+          [IO.File]::WriteAllText($fm, $t1, $enc)
+          $ab = 'Plain Craft Launcher 2/Pages/PageOtherAbout.xaml'
+          $t2 = [IO.File]::ReadAllText($ab, [Text.Encoding]::UTF8)
+          $t2 = $t2.Replace('Title="Plain Craft Launcher 2"', 'Title="新清歌版 PCL"')
+          [IO.File]::WriteAllText($ab, $t2, $enc)
+          $ap = 'Plain Craft Launcher 2/Application.xaml.vb'
+          $apLines = [IO.File]::ReadAllLines($ap)
+          $apOut = New-Object System.Collections.Generic.List[string]
+          $hitM = $false
+          foreach ($l in $apLines) {
+              if ($l.Contains('If BuildType = BuildTypes.Debug Then Return')) {
+                  $ind = $l.Substring(0, $l.Length - $l.Trim().Length)
+                  $apOut.Add($ind + "Return ' 新清歌版：允许多开")
+                  $hitM = $true
+                  continue
+              }
+              $apOut.Add($l)
+          }
+          if (-not $hitM) { throw '未找到单例互斥入口，允许多开失败。' }
+          [IO.File]::WriteAllLines($ap, $apOut, $enc)
+          Write-Host '已品牌化并允许多开。'
+
       - name: 准备内置帮助文档
         shell: pwsh
         run: |
