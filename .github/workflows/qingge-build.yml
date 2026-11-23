@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/qingge-build.yml'
+      - 'patches/**'
   workflow_dispatch:
 
 permissions:
@@ -21,13 +22,55 @@ jobs:
 
       - name: 应用新清歌版补丁
         shell: pwsh
-        run: ./patches/apply-qingge.ps1
+        run: |
+          ./patches/apply-qingge.ps1
+          $ErrorActionPreference = 'Stop'
+          $enc = New-Object System.Text.UTF8Encoding($true)
+          $vb = 'Plain Craft Launcher 2/Pages/PageLaunch/PageLaunchLeft.xaml.vb'
+          $lx = 'Plain Craft Launcher 2/Pages/PageLaunch/PageLaunchLeft.xaml'
+          $lines = [IO.File]::ReadAllLines($vb)
+          $out = New-Object System.Collections.Generic.List[string]
+          $hitA = $false
+          $hitB = $false
+          foreach ($line in $lines) {
+              $trim = $line.Trim()
+              if ($trim -eq 'If RadioLoginType5.Checked Then') {
+                  $out.Add($line.Replace('If RadioLoginType5.Checked Then', 'If False Then'))
+                  $hitA = $true
+                  continue
+              }
+              if ($trim -eq 'Case 1 ''仅正版') {
+                  $indent = $line.Substring(0, $line.Length - $trim.Length)
+                  $out.Add($line)
+                  $out.Add($indent + '    Type = PageType.Legacy')
+                  $out.Add($indent + '    Settings.Set("LoginType", McLoginType.Legacy)')
+                  $out.Add($indent + '    PanType.Visibility = Visibility.Collapsed')
+                  $out.Add($indent + '    PanTypeOne.Visibility = Visibility.Visible')
+                  $out.Add($indent + '    PathTypeOne.Data = (New GeometryConverter).ConvertFromString(Logo.IconButtonOffline)')
+                  $out.Add($indent + '    LabTypeOne.Text = "离线登录"')
+                  $out.Add($indent + '    Exit Select')
+                  $hitB = $true
+                  continue
+              }
+              if ($line.Contains('RadioLoginType5.Visibility = Visibility.Visible')) {
+                  $out.Add($line.Replace('RadioLoginType5.Visibility = Visibility.Visible', 'RadioLoginType5.Visibility = Visibility.Collapsed'))
+                  continue
+              }
+              $out.Add($line)
+          }
+          if (-not $hitA) { throw '未找到正版/离线登录判断，隐藏正版登录失败。' }
+          if (-not $hitB) { throw '未找到仅正版登录分支，隐藏正版登录失败。' }
+          [IO.File]::WriteAllLines($vb, $out, $enc)
+          $text = [IO.File]::ReadAllText($lx, [Text.Encoding]::UTF8)
+          $text = $text.Replace('Text="正版" Margin="4,0"', 'Text="正版" Margin="4,0" Visibility="Collapsed"')
+          [IO.File]::WriteAllText($lx, $text, $enc)
+          Write-Host '已隐藏正版登录入口。'
 
       - name: 准备内置帮助文档
         shell: pwsh
         run: |
           git clone https://github.com/LTCatt/PCL2Help.git -b master --single-branch --depth 1 ../PCL2Help
-          Compress-Archive -Path ../PCL2Help/* -DestinationPath "Plain Craft Launcher 2\Resources\Help.zip" -Force
+          Compress-Archive -Path ../PCL2Help/* -DestinationPath "Plain Craft Launcher 2/Resources/Help.zip" -Force
           Remove-Item ../PCL2Help -Recurse -Force
 
       - name: 配置 MSBuild
@@ -36,16 +79,16 @@ jobs:
           msbuild-architecture: x64
 
       - name: 还原 NuGet 依赖
-        run: dotnet restore PCLCS\PCLCS.csproj
+        run: dotnet restore PCLCS/PCLCS.csproj
 
       - name: 编译启动器
-        run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Release -p:Platform=AnyCPU
+        run: msbuild "Plain Craft Launcher 2/Plain Craft Launcher 2.vbproj" -p:Configuration=Release -p:Platform=AnyCPU
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: QinggePCL-exe
-          path: Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe
+          path: Plain Craft Launcher 2/obj/Release/Plain Craft Launcher 2.exe
           if-no-files-found: error
 
       - name: 通过 API 保存 exe 便于下载
@@ -53,7 +96,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $exe = "Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe"
+          $exe = "Plain Craft Launcher 2/obj/Release/Plain Craft Launcher 2.exe"
           $bytes = [IO.File]::ReadAllBytes($exe)
           $b64 = [Convert]::ToBase64String($bytes)
           $body = (@{ message = "chore: save exe [skip ci]"; content = $b64; branch = "main" } | ConvertTo-Json -Compress)
