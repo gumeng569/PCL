@@ -71,7 +71,7 @@ jobs:
           $t1 = [IO.File]::ReadAllText($fm, [Text.Encoding]::UTF8)
           $t1 = $t1.Replace('Title="Plain Craft Launcher', 'Title="新清歌版 PCL')
           [IO.File]::WriteAllText($fm, $t1, $enc)
-          $ab = 'Plain Craft Launcher 2/Pages/PageOtherAbout.xaml'
+          $ab = 'Plain Craft Launcher 2/Pages/PageOther/PageOtherAbout.xaml'
           $t2 = [IO.File]::ReadAllText($ab, [Text.Encoding]::UTF8)
           $t2 = $t2.Replace('Title="Plain Craft Launcher 2"', 'Title="新清歌版 PCL"')
           [IO.File]::WriteAllText($ab, $t2, $enc)
