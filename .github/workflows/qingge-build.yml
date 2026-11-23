@@ -99,10 +99,13 @@ jobs:
           $exe = "Plain Craft Launcher 2/obj/Release/Plain Craft Launcher 2.exe"
           $bytes = [IO.File]::ReadAllBytes($exe)
           $b64 = [Convert]::ToBase64String($bytes)
-          $body = (@{ message = "chore: save exe [skip ci]"; content = $b64; branch = "main" } | ConvertTo-Json -Compress)
-          $tmp = Join-Path $env:RUNNER_TEMP "body.json"
-          [IO.File]::WriteAllText($tmp, $body, (New-Object System.Text.UTF8Encoding($false)))
           $uri = "https://api.github.com/repos/gumeng569/PCL/contents/release/QinggePCL.exe"
           $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "qingge-bot"; "Accept" = "application/vnd.github+json" }
+          $oldSha = $null
+          try { $cur = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers; $oldSha = $cur.sha } catch { Write-Host 'release 文件尚不存在，将新建。' }
+          $payload = @{ message = "chore: save exe [skip ci]"; content = $b64; branch = "main" }
+          if ($oldSha) { $payload.sha = $oldSha }
+          $tmp = Join-Path $env:RUNNER_TEMP "body.json"
+          [IO.File]::WriteAllText($tmp, ($payload | ConvertTo-Json -Compress), (New-Object System.Text.UTF8Encoding($false)))
           $resp = Invoke-RestMethod -Method Put -Uri $uri -Headers $headers -InFile $tmp -ContentType "application/json"
           Write-Host "saved commit: $($resp.commit.sha)"
