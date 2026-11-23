@@ -49,8 +49,7 @@ jobs:
           if-no-files-found: error
 
       - name: 通过 API 保存 exe 便于下载
-        shell: pwwsh
-        continue-on-error: true
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
