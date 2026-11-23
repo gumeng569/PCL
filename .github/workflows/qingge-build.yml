@@ -48,13 +48,19 @@ jobs:
           path: Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe
           if-no-files-found: error
 
-      - name: 把 exe 提交回仓库便于下载
-        shell: pwsh
+      - name: 通过 API 保存 exe 便于下载
+        shell: pwwsh
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          New-Item -ItemType Directory -Force -Path release | Out-Null
-          Copy-Item "Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe" "release\QinggePCL.exe" -Force
-          git config user.name "qingge-bot"
-          git config user.email "qingge-bot@users.noreply.github.com"
-          git add "release/QinggePCL.exe"
-          git commit -m "chore: 更新新清歌版PCL 构建产物 [skip ci]"
-          git push origin HEAD:main
+          $exe = "Plain Craft Launcher 2\obj\Release\Plain Craft Launcher 2.exe"
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $b64 = [Convert]::ToBase64String($bytes)
+          $body = (@{ message = "chore: save exe [skip ci]"; content = $b64; branch = "main" } | ConvertTo-Json -Compress)
+          $tmp = Join-Path $env:RUNNER_TEMP "body.json"
+          [IO.File]::WriteAllText($tmp, $body, (New-Object System.Text.UTF8Encoding($false)))
+          $uri = "https://api.github.com/repos/gumeng569/PCL/contents/release/QinggePCL.exe"
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; "User-Agent" = "qingge-bot"; "Accept" = "application/vnd.github+json" }
+          $resp = Invoke-RestMethod -Method Put -Uri $uri -Headers $headers -InFile $tmp -ContentType "application/json"
+          Write-Host "saved commit: $($resp.commit.sha)"
